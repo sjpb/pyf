@@ -20,13 +20,32 @@ import argparse
 import json
 
 parser = argparse.ArgumentParser(description="Use python expressions to process stdout")
-parser.add_argument("expr", help="Python expression to evaluate on each line of input")
+parser.add_argument("expression", help="Python expression to evaluate on each line of input")
+
 parser.add_argument("--json", "-j", action="store_true", help="Parse input as JSON")
+parser.add_argument("--lines", "-l", action="store_true", help="Apply EXPRESSION to each line. Variables: lno, line.")
+parser.add_argument("--split", action="store_true", help="Split each record")
+parser.add_argument("--quiet", "-q", action="store_true", help="Don't print result of EXPRESSION")
 args = parser.parse_args()
+print('args:', args)
+#exit()
 
 with open(0) as f:
-    data = f.read()
-    if args.json:
-        data = json.loads(data)
-    result = eval(args.expr)
-    print(result)
+    if args.lines:
+        for lno, line in enumerate(f):
+            lno = lno + 1
+            line = line.strip()
+            if args.split:
+                line = line.split()
+            result = eval(args.expression)
+            if not args.quiet:
+                print(result)
+    else:
+        data = f.read()
+        if args.json:
+            data = json.loads(data)
+        if args.split:
+            data = data.split()
+        result = eval(args.expression)
+        if not args.quiet:
+            print(result)
