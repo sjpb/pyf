@@ -26,14 +26,16 @@ parser.add_argument("--json", "-j", action="store_true", help="Parse input as JS
 parser.add_argument("--lines", "-l", action="store_true", help="Apply EXPRESSION to each line. Variables: lno, line.")
 parser.add_argument("--split", action="store_true", help="Split each record")
 parser.add_argument("--quiet", "-q", action="store_true", help="Don't print result of EXPRESSION")
+parser.add_argument("--noheader", "-n", action="store_true", help="Ignore first line")
 args = parser.parse_args()
-print('args:', args)
-#exit()
+#print('args:', args)
 
 with open(0) as f:
     if args.lines:
         for lno, line in enumerate(f):
             lno = lno + 1
+            if args.noheader and lno ==1 :
+                continue
             line = line.strip()
             if args.split:
                 line = line.split()
@@ -42,6 +44,8 @@ with open(0) as f:
                 print(result)
     else:
         data = f.read()
+        if args.noheader:
+            data = '\n'.join(data.splitlines()[1:])
         if args.json:
             data = json.loads(data)
         if args.split:
