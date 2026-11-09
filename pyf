@@ -1,32 +1,42 @@
 #!/usr/bin/env python3
 """
+Process files or stdout using python expressions.
+
+It has two main modes:
+
+In file mode (the default), EXPRESSION can use variable "data" which contains the entire
+contents of the file(s). The result of EXPRESSION is printed by default.
+
+In line mode (--lines, -l), the file is read line by line and EXPRESSION can use the variables
+"lno" (1-based line number) and "line" (stripped line contents). For each line by default the
+result of EXPRESSION is printed only if True.
+
+In either case the `--quiet, -q` option can be used to suppress the default output, in which
+case EXPRESSION must contain `print()` to get any output.
+
 Examples:
 
-    $ openstack server show  -c security_groups myserver -f value
-    [{'name': 'gpfs'}, {'name': 'default'}]
-
-    This is python data, so we can use eval() to convert it to a python object then extract the unique names:
-
-    $ openstack server show  -c security_groups myserver -f value | ./pyf "sorted(set(tuple(v.values())[0] for v in eval(data)))"
-    ['default', 'gpfs']
-
-    Or we can do the same thing with json output:
-    $ openstack server show  -c security_groups myserver -f json | ./pyf --json "sorted(set(tuple(v.values())[0] for v in data['security_groups']))"
-    ['default', 'gpfs']
+    Print alternate lines of a file:
+    $ ./pyf -l "line if lno % 2 else False" myfile
+    
+    List UIDs for all users beginning with 's':
+    $ ./pyf -l "line.split(':')[0] if re.findall(r'^s', line) else False" /etc/passwd
 
 """
 import argparse
 import json
 import fileinput
+import re # this seems pretty useless given re.*() return None OR match
 
-parser = argparse.ArgumentParser(description="Use python expressions to process stdout")
+parser = argparse.ArgumentParser(description=__doc__.splitlines()[1])
 parser.add_argument("expression", help="Python expression to evaluate on each line of input")
 
-parser.add_argument("--json", "-j", action="store_true", help="Parse input as JSON")
+parser.add_argument("--json", "-j", action="store_true", help="Parse input as JSON (file mode only)")
 parser.add_argument("--lines", "-l", action="store_true", help="Apply EXPRESSION to each line. Variables: lno, line.")
-parser.add_argument("--split", action="store_true", help="Split each record")
+parser.add_argument("--split", "-s", action="store_true", help="Split each record")
 parser.add_argument("--quiet", "-q", action="store_true", help="Don't print result of EXPRESSION")
 parser.add_argument("--noheader", "-n", action="store_true", help="Ignore first line")
+parser.add_argument("--comments", "-c", action="store_true", help="Ignore comment (#) and blank lines")
 parser.add_argument("file", nargs="?", default="-", help="File to process (default: stdin)")
 args = parser.parse_args()
 #print('args:', args)
@@ -39,10 +49,12 @@ with fileinput.input(args.file) as f:
             if args.noheader and lno ==1 :
                 continue
             line = line.strip()
+            if args.comments and (not line or line[0] == "#"):
+                continue
             if args.split:
                 line = line.split()
             result = eval(args.expression)
-            if not args.quiet:
+            if not args.quiet and result:
                 print(result)
     else:
         data = "".join(list(f)[1:] if args.noheader else f) # TODO: this is terrible, there must be a better way:
